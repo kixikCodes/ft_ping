@@ -1,0 +1,5 @@
+**.o
+**.a
+**.pdf
+tests/
+.vscode/

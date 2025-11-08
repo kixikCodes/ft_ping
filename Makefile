@@ -8,7 +8,7 @@ RESET = \033[0m
 #					SOURCE AND OBJECT FILES
 LIB = libft/libft.a
 SRC_DIR = src
-SRC_FILES = $(SRC_DIR)/ft_ping.c $(SRC_DIR)/utils.c
+SRC_FILES = $(SRC_DIR)/ft_ping.c $(SRC_DIR)/icmp.c $(SRC_DIR)/utils.c $(SRC_DIR)/error.c
 OBJ = $(SRC_FILES:.c=.o)
 
 #					CODE AND RULES

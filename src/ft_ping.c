@@ -57,49 +57,49 @@ static void recv_and_log_res(int sockfd, pid_t pid, int *recv_count) {
     t_ipaddr    r_addr;
     ssize_t     recvd;
 
-    // Wait for reply
-    recvd = receive_icmp_reply(sockfd, &r_addr, recv_buf, g_opt_flood);
-    if (recvd <= 0 || errno == EINTR)
-        return;
-    inet_ntop(AF_INET, &r_addr.sin_addr, addr_str, sizeof(addr_str));
-    // Extract reply info and verify checksum
-    t_ipheader  *ip_hdr = (t_ipheader *)recv_buf;
-    int         ip_hdr_len = (ip_hdr->ihl & 0x0f) * 4;
-    t_icmp      *icmp_resp = (t_icmp *)(recv_buf + ip_hdr_len);
-    u_int16_t   received_cs = icmp_resp->checksum;
-    icmp_resp->checksum = 0;
-    if (received_cs != checksum(icmp_resp, recvd - ip_hdr_len)) {
-        if (g_opt_verbose)
-            fprintf(stderr, YELLOW "ft_ping: bad ICMP checksum: %s\n" RESET, addr_str);
-        return;
-    }
-    icmp_resp->checksum = received_cs;
-    // Check reply length and create a log
-    if (recvd - ip_hdr_len >= (int)(sizeof(t_icmp) + sizeof(t_time))) {
-        if (icmp_resp->type == ICMP_ECHOREPLY &&
-            ntohs(icmp_resp->un.echo.id) == (pid & 0xFFFF)) {
-            t_time  tv_end;
-            gettimeofday(&tv_end, NULL);
-            t_time  *t_sent = (t_time *)(recv_buf + ip_hdr_len + sizeof(t_icmp));
-            double rtt = (tv_end.tv_sec - t_sent->tv_sec) * 1000.0 + (tv_end.tv_usec - t_sent->tv_usec) / 1000.0;
-            
-            if (g_opt_flood && !g_opt_quiet) { // Flood ping
-                printf("\b");
-                fflush(stdout); // Justified by Bonus!
-            } else if (g_opt_verbose && !g_opt_quiet) { // Verbose logs
-                log_verbose((long)(recvd - ip_hdr_len), addr_str, ntohs(icmp_resp->un.echo.sequence),
-                            ntohs(icmp_resp->un.echo.id), ip_hdr->ttl, rtt);
-            } else if (!g_opt_quiet) { // Regular logs
-                log_regular((long)(recvd - ip_hdr_len), addr_str, ntohs(icmp_resp->un.echo.sequence),
-                            ip_hdr->ttl, rtt);
-            }
-            (*recv_count)++;
+    while (g_pingloop) {
+        recvd = receive_icmp_reply(sockfd, &r_addr, recv_buf, g_opt_flood);
+        if (recvd <= 0 || errno == EINTR)
             return;
-        } else if (g_opt_verbose && !g_opt_quiet) // Other responses warned in verbose mode
-            packet_warning(icmp_resp);
-    } else {
-        if (g_opt_verbose) // Packet is cut short, custom warning (verbose)
-            printf(YELLOW "ft_ping: received short ICMP packet: %s\n" RESET, addr_str);
+        inet_ntop(AF_INET, &r_addr.sin_addr, addr_str, sizeof(addr_str));
+
+        t_ipheader  *ip_hdr = (t_ipheader *)recv_buf;
+        int         ip_hdr_len = (ip_hdr->ihl & 0x0f) * 4;
+        t_icmp      *icmp_resp = (t_icmp *)(recv_buf + ip_hdr_len);
+        if (recvd - ip_hdr_len < (int)(sizeof(t_icmp) + sizeof(t_time)))
+            continue;
+        if (icmp_resp->type != ICMP_ECHOREPLY || ntohs(icmp_resp->un.echo.id) != (pid & 0xFFFF)) {
+            if (g_opt_verbose && !g_opt_quiet)
+                packet_warning(icmp_resp);
+            continue;
+        }
+
+        u_int16_t received_cs = icmp_resp->checksum;
+        icmp_resp->checksum = 0;
+        if (received_cs != checksum(icmp_resp, recvd - ip_hdr_len)) {
+            if (g_opt_verbose)
+                fprintf(stderr, YELLOW "ft_ping: bad ICMP checksum: %s\n" RESET, addr_str);
+            continue;
+        }
+        icmp_resp->checksum = received_cs;
+
+        t_time tv_end;
+        gettimeofday(&tv_end, NULL);
+        t_time *t_sent = (t_time *)((char *)icmp_resp + sizeof(*icmp_resp));
+        double rtt = (tv_end.tv_sec - t_sent->tv_sec) * 1000.0
+                   + (tv_end.tv_usec - t_sent->tv_usec) / 1000.0;
+        if (g_opt_flood && !g_opt_quiet) {
+            printf("\b");
+            fflush(stdout);
+        } else if (g_opt_verbose && !g_opt_quiet) {
+            log_verbose((long)(recvd - ip_hdr_len), addr_str,
+                ntohs(icmp_resp->un.echo.sequence), ntohs(icmp_resp->un.echo.id),
+                ip_hdr->ttl, rtt);
+        } else if (!g_opt_quiet) {
+            log_regular((long)(recvd - ip_hdr_len), addr_str,
+                ntohs(icmp_resp->un.echo.sequence), ip_hdr->ttl, rtt);
+        }
+        (*recv_count)++;
         return;
     }
 }

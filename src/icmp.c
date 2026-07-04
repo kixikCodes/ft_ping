@@ -11,7 +11,7 @@ void    build_icmp_request(t_icmp *icmp_hdr, unsigned int seq_no, pid_t pid) {
     icmp_hdr->un.echo.id = htons(pid & 0xFFFF);
     icmp_hdr->un.echo.sequence = htons(seq_no);
     gettimeofday(&tv_start, NULL);
-    ft_memcpy((char *)icmp_hdr + sizeof(t_icmp), &tv_start, sizeof(tv_start));
+    ft_memcpy((char *)icmp_hdr + sizeof(*icmp_hdr), &tv_start, sizeof(tv_start));
     icmp_hdr->checksum = 0;
     icmp_hdr->checksum = checksum(icmp_hdr, PING_PACKET_SIZE);
 }

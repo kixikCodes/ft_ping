@@ -126,7 +126,7 @@ static void ping_loop(int sockfd, t_ipaddr *addr, char *ip, char *host) {
         send_icmp_request(sockfd, addr, send_buf);
         if (g_opt_flood && !g_opt_quiet) {
             printf(".");
-            fflush(stdout); // Justified by Bonus!
+            fflush(stdout); // same deal.
         }
         msg_count++;
         recv_and_log_res(sockfd, pid, &recv_count);
